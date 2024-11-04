@@ -19,6 +19,12 @@ package mb
 import (
 	"fmt"
 	apiconsts "github.com/kubewharf/katalyst-api/pkg/consts"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller/mbdomain"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller/policy"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/monitor"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/podadmit"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/resctrl/state"
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/task"
 	"time"
 
 	"github.com/pkg/errors"
@@ -28,13 +34,7 @@ import (
 	"github.com/kubewharf/katalyst-core/cmd/katalyst-agent/app/agent"
 	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/allocator"
 	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller/mbdomain"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller/policy"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/monitor"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/podadmit"
 	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/resctrl"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/resctrl/state"
-	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/task"
 	"github.com/kubewharf/katalyst-core/pkg/config"
 	"github.com/kubewharf/katalyst-core/pkg/config/generic"
 	"github.com/kubewharf/katalyst-core/pkg/util/general"
@@ -68,44 +68,6 @@ func (p *plugin) Start() error {
 		return errors.New("mbm: not virtual numa; no need to dynamically manage the memory bandwidth")
 	}
 
-	domainManager := mbdomain.NewMBDomainManager(p.dieTopology, p.incubationInterval)
-
-	var err error
-
-	dataKeeper, err := state.NewMBRawDataKeeper()
-	if err != nil {
-		return errors.Wrap(err, "failed to create raw data state keeper")
-	}
-
-	taskManager, err := task.New(p.dieTopology.DiesInNuma, p.dieTopology.CPUsInDie, dataKeeper, domainManager)
-	if err != nil {
-		return errors.Wrap(err, "failed to create task manager")
-	}
-
-	podMBMonitor, err := monitor.NewDefaultMBMonitor(p.dieTopology.CPUsInDie, dataKeeper, taskManager, domainManager)
-	if err != nil {
-		return errors.Wrap(err, "mbm: failed to create default mb monitor")
-	}
-
-	mbPlanAllocator, err := createMBPlanAllocator()
-	if err != nil {
-		return errors.Wrap(err, "mbm: failed to create mb plan allocator")
-	}
-
-	domainPolicy, err := policy.NewDefaultDomainMBPolicy(p.incubationInterval)
-	if err != nil {
-		return errors.Wrap(err, "mbm: failed to create domain manager")
-	}
-
-	p.mbController, err = controller.New(podMBMonitor, mbPlanAllocator, domainManager, domainPolicy)
-	if err != nil {
-		return errors.Wrap(err, "mbm: failed to create mb controller")
-	}
-
-	p.QRMPlugin, err = podadmit.NewPodAdmitService(p.qosConfig, domainManager, p.mbController, taskManager)
-	if err != nil {
-		return errors.Wrap(err, "mbm: failed to create pod admit service")
-	}
 	if err := p.QRMPlugin.Start(); err != nil {
 		return errors.Wrap(err, "mbm: failed to start pod admit service")
 	}
@@ -151,14 +113,53 @@ func (p *plugin) Stop() error {
 func NewComponent(agentCtx *agent.GenericContext, conf *config.Configuration,
 	_ interface{}, agentName string,
 ) (bool, agent.Component, error) {
-	plugin := &plugin{
+	p := &plugin{
 		qosConfig:              conf.QoSConfiguration,
 		pluginRegistrationDirs: conf.QRMPluginSocketDirs,
 		dieTopology:            agentCtx.DieTopology,
 		incubationInterval:     conf.IncubationInterval,
 	}
 
-	pluginWrapper, err := skeleton.NewRegistrationPluginWrapper(plugin, conf.QRMPluginSocketDirs, nil)
+	domainManager := mbdomain.NewMBDomainManager(p.dieTopology, p.incubationInterval)
+
+	var err error
+
+	dataKeeper, err := state.NewMBRawDataKeeper()
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "failed to create raw data state keeper")
+	}
+
+	taskManager, err := task.New(p.dieTopology.DiesInNuma, p.dieTopology.CPUsInDie, dataKeeper, domainManager)
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "failed to create task manager")
+	}
+
+	podMBMonitor, err := monitor.NewDefaultMBMonitor(p.dieTopology.CPUsInDie, dataKeeper, taskManager, domainManager)
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "mbm: failed to create default mb monitor")
+	}
+
+	mbPlanAllocator, err := createMBPlanAllocator()
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "mbm: failed to create mb plan allocator")
+	}
+
+	domainPolicy, err := policy.NewDefaultDomainMBPolicy(p.incubationInterval)
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "mbm: failed to create domain manager")
+	}
+
+	p.mbController, err = controller.New(podMBMonitor, mbPlanAllocator, domainManager, domainPolicy)
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "mbm: failed to create mb controller")
+	}
+
+	p.QRMPlugin, err = podadmit.NewPodAdmitService(p.qosConfig, domainManager, p.mbController, taskManager)
+	if err != nil {
+		return false, agent.ComponentStub{}, errors.Wrap(err, "mbm: failed to create pod admit service")
+	}
+
+	pluginWrapper, err := skeleton.NewRegistrationPluginWrapper(p, conf.QRMPluginSocketDirs, nil)
 	if err != nil {
 		return false, agent.ComponentStub{}, fmt.Errorf("static policy new plugin wrapper failed with error: %v", err)
 	}
