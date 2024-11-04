@@ -141,7 +141,7 @@ func createMBPlanAllocator() (allocator.PlanAllocator, error) {
 func (p *plugin) Stop() error {
 	// todo: not sure why not being called on ctrl-C ???
 	general.Infof("mbm: mb plugin is stopping...")
-	if p.QRMPlugin.Stop() != nil {
+	if p.QRMPlugin != nil {
 		_ = p.QRMPlugin.Stop()
 	}
 
