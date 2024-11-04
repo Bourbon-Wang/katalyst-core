@@ -20,9 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
-
 	apiconsts "github.com/kubewharf/katalyst-api/pkg/consts"
+	"github.com/kubewharf/katalyst-api/pkg/plugins/skeleton"
 	pluginapi "k8s.io/kubelet/pkg/apis/resourceplugin/v1alpha1"
 
 	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/mb/controller"
@@ -34,24 +33,55 @@ import (
 
 type admitter struct {
 	pluginapi.UnimplementedResourcePluginServer
+	name          string
 	qosConfig     *generic.QoSConfiguration
 	domainManager *mbdomain.MBDomainManager
 	mbController  *controller.Controller
 	taskManager   task.Manager
 }
 
+func NewPodAdmitService(qosConfig *generic.QoSConfiguration,
+	domainManager *mbdomain.MBDomainManager, mbController *controller.Controller, taskManager task.Manager) (skeleton.QRMPlugin, error) {
+	return &admitter{
+		UnimplementedResourcePluginServer: pluginapi.UnimplementedResourcePluginServer{},
+		name:                              "mb-pod-admit",
+		qosConfig:                         qosConfig,
+		domainManager:                     domainManager,
+		mbController:                      mbController,
+		taskManager:                       taskManager,
+	}, nil
+}
+
+func (m admitter) Name() string { return m.name }
+
+func (m admitter) ResourceName() string { return string(apiconsts.ResourceMemoryBandwidth) }
+
+func (m admitter) Start() error { return nil }
+
+func (m admitter) Stop() error { return nil }
+
 func (m admitter) GetTopologyAwareResources(ctx context.Context, request *pluginapi.GetTopologyAwareResourcesRequest) (*pluginapi.GetTopologyAwareResourcesResponse, error) {
 	general.InfofV(6, "mbm: pod admit is enquired with topology aware resource")
-	return &pluginapi.GetTopologyAwareResourcesResponse{}, nil
+	return &pluginapi.GetTopologyAwareResourcesResponse{
+		PodUid: request.PodUid,
+		ContainerTopologyAwareResources: &pluginapi.ContainerTopologyAwareResources{
+			ContainerName:      request.ContainerName,
+			AllocatedResources: make(map[string]*pluginapi.TopologyAwareResource),
+		},
+	}, nil
 }
 
 func (m admitter) GetTopologyAwareAllocatableResources(ctx context.Context, request *pluginapi.GetTopologyAwareAllocatableResourcesRequest) (*pluginapi.GetTopologyAwareAllocatableResourcesResponse, error) {
 	general.InfofV(6, "mbm: pod admit is enquired with allocatable resources")
 	return &pluginapi.GetTopologyAwareAllocatableResourcesResponse{
 		AllocatableResources: map[string]*pluginapi.AllocatableTopologyAwareResource{
-			string(v1.ResourceMemory): {},
+			m.ResourceName(): {},
 		},
 	}, nil
+}
+
+func (m admitter) RemovePod(context.Context, *pluginapi.RemovePodRequest) (*pluginapi.RemovePodResponse, error) {
+	return &pluginapi.RemovePodResponse{}, nil
 }
 
 func (m admitter) Allocate(ctx context.Context, req *pluginapi.ResourceRequest) (*pluginapi.ResourceAllocationResponse, error) {

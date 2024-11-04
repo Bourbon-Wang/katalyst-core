@@ -17,6 +17,7 @@ limitations under the License.
 package mb
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -46,8 +47,8 @@ type plugin struct {
 	dieTopology        *machine.DieTopology
 	incubationInterval time.Duration
 
-	mbController    *controller.Controller
-	podAdmitService skeleton.GenericPlugin
+	mbController *controller.Controller
+	skeleton.QRMPlugin
 }
 
 func (p *plugin) Name() string {
@@ -98,11 +99,11 @@ func (p *plugin) Start() error {
 		return errors.Wrap(err, "mbm: failed to create mb controller")
 	}
 
-	p.podAdmitService, err = podadmit.NewPodAdmitService(p.qosConfig, domainManager, p.mbController, taskManager, p.pluginRegistrationDirs)
+	p.QRMPlugin, err = podadmit.NewPodAdmitService(p.qosConfig, domainManager, p.mbController, taskManager)
 	if err != nil {
 		return errors.Wrap(err, "mbm: failed to create pod admit service")
 	}
-	if err := p.podAdmitService.Start(); err != nil {
+	if err := p.QRMPlugin.Start(); err != nil {
 		return errors.Wrap(err, "mbm: failed to start pod admit service")
 	}
 
@@ -137,10 +138,8 @@ func createMBPlanAllocator() (allocator.PlanAllocator, error) {
 func (p *plugin) Stop() error {
 	// todo: not sure why not being called on ctrl-C ???
 	general.Infof("mbm: mb plugin is stopping...")
-	if p.podAdmitService != nil {
-		if err := p.podAdmitService.Stop(); err != nil {
-			general.Errorf("mbm: plugin failed to stop pod admitter service: %v", err)
-		}
+	if p.QRMPlugin.Stop() != nil {
+		_ = p.QRMPlugin.Stop()
 	}
 
 	return p.mbController.Stop()
@@ -156,5 +155,10 @@ func NewComponent(agentCtx *agent.GenericContext, conf *config.Configuration,
 		incubationInterval:     conf.IncubationInterval,
 	}
 
-	return true, &agent.PluginWrapper{GenericPlugin: plugin}, nil
+	pluginWrapper, err := skeleton.NewRegistrationPluginWrapper(plugin, conf.QRMPluginSocketDirs, nil)
+	if err != nil {
+		return false, agent.ComponentStub{}, fmt.Errorf("static policy new plugin wrapper failed with error: %v", err)
+	}
+
+	return true, &agent.PluginWrapper{GenericPlugin: pluginWrapper}, nil
 }
