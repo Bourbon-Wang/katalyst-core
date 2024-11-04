@@ -18,6 +18,7 @@ package mb
 
 import (
 	"fmt"
+	apiconsts "github.com/kubewharf/katalyst-api/pkg/consts"
 	"time"
 
 	"github.com/pkg/errors"
@@ -54,6 +55,8 @@ type plugin struct {
 func (p *plugin) Name() string {
 	return "qrm_mb_plugin"
 }
+
+func (p *plugin) ResourceName() string { return string(apiconsts.ResourceMemoryBandwidth) }
 
 func (p *plugin) Start() error {
 	general.InfofV(6, "mbm: plugin component starting ....")
