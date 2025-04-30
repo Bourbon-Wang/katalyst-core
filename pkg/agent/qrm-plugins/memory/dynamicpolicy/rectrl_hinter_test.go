@@ -20,26 +20,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	pluginapi "k8s.io/kubelet/pkg/apis/resourceplugin/v1alpha1"
 
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/commonstate"
 	"github.com/kubewharf/katalyst-core/pkg/config/agent/qrm"
 )
 
 func TestResctrlProcessor_HintResp(t *testing.T) {
 	t.Parallel()
-
-	respTest := &pluginapi.ResourceAllocationResponse{
-		AllocationResult: &pluginapi.ResourceAllocation{
-			ResourceAllocation: map[string]*pluginapi.ResourceAllocationInfo{
-				"memory": {
-					Annotations: map[string]string{
-						"test-key": "test-value",
-					},
-				},
-			},
-		},
-	}
 
 	type fields struct {
 		option *qrm.ResctrlOptions
@@ -62,9 +50,10 @@ func TestResctrlProcessor_HintResp(t *testing.T) {
 			},
 			args: args{
 				qosLevel: "shared_cores",
-				resp:     respTest,
+				req:      &pluginapi.ResourceRequest{},
+				resp:     newTestResp(),
 			},
-			want: respTest,
+			want: newTestResp(),
 		},
 		{
 			name: "disabled opt no change",
@@ -82,9 +71,9 @@ func TestResctrlProcessor_HintResp(t *testing.T) {
 						"katalyst.kubewharf.io/cpu_enhancement": `{"cpuset_pool":"batch"}`,
 					},
 				},
-				resp: respTest,
+				resp: newTestResp(),
 			},
-			want: respTest,
+			want: newTestResp(),
 		},
 		{
 			name: "batch is shared-30 if specified so, and no pod mon-group",
@@ -106,7 +95,7 @@ func TestResctrlProcessor_HintResp(t *testing.T) {
 						"katalyst.kubewharf.io/cpu_enhancement": `{"cpuset_pool":"batch"}`,
 					},
 				},
-				resp: respTest,
+				resp: newTestResp(),
 			},
 			want: &pluginapi.ResourceAllocationResponse{
 				AllocationResult: &pluginapi.ResourceAllocation{
@@ -142,7 +131,7 @@ func TestResctrlProcessor_HintResp(t *testing.T) {
 						"katalyst.kubewharf.io/cpu_enhancement": `{"cpuset_pool":"batch"}`,
 					},
 				},
-				resp: respTest,
+				resp: newTestResp(),
 			},
 			want: &pluginapi.ResourceAllocationResponse{
 				AllocationResult: &pluginapi.ResourceAllocation{
@@ -158,12 +147,31 @@ func TestResctrlProcessor_HintResp(t *testing.T) {
 			},
 		},
 	}
-	for _, tt := range tests {
-		tt := tt
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := newResctrlHinter(tt.fields.option)
-			assert.Equalf(t, tt.want, r.HintResp(tt.args.qosLevel, tt.args.req, tt.args.resp), "HintResp(%v, %v, %v)", tt.args.qosLevel, tt.args.req, tt.args.resp)
+			meta := commonstate.AllocationMeta{
+				Annotations: tt.args.req.Annotations,
+				QoSLevel:    tt.args.qosLevel,
+			}
+			r.HintResourceAllocation(meta, tt.args.resp.AllocationResult)
+			assert.Equalf(t, tt.want, tt.args.resp, "HintResourceAllocation(%v, %v, %v)", tt.args.qosLevel, tt.args.req, tt.args.resp)
 		})
+	}
+}
+
+func newTestResp() *pluginapi.ResourceAllocationResponse {
+	return &pluginapi.ResourceAllocationResponse{
+		AllocationResult: &pluginapi.ResourceAllocation{
+			ResourceAllocation: map[string]*pluginapi.ResourceAllocationInfo{
+				"memory": {
+					Annotations: map[string]string{
+						"test-key": "test-value",
+					},
+				},
+			},
+		},
 	}
 }

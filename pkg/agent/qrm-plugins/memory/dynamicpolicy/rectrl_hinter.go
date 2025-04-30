@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strconv"
 
+	apiconsts "github.com/kubewharf/katalyst-api/pkg/consts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/resourceplugin/v1alpha1"
 
-	apiconsts "github.com/kubewharf/katalyst-api/pkg/consts"
-
+	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/commonstate"
 	"github.com/kubewharf/katalyst-core/pkg/agent/qrm-plugins/util"
 	"github.com/kubewharf/katalyst-core/pkg/config/agent/qrm"
 	"github.com/kubewharf/katalyst-core/pkg/util/general"
@@ -38,8 +38,7 @@ const (
 )
 
 type ResctrlHinter interface {
-	HintResp(qosLevel string, req *pluginapi.ResourceRequest, resp *pluginapi.ResourceAllocationResponse,
-	) *pluginapi.ResourceAllocationResponse
+	HintResourceAllocation(podMeta commonstate.AllocationMeta, resourceAllocation *pluginapi.ResourceAllocation)
 }
 
 type resctrlHinter struct {
@@ -82,12 +81,12 @@ func (r *resctrlHinter) getSharedSubgroupByPool(pool string) string {
 	return getSharedSubgroup(r.option.DefaultSharedSubgroup)
 }
 
-func ensureToGetMemAllocInfo(resp *pluginapi.ResourceAllocationResponse) *pluginapi.ResourceAllocationInfo {
-	if _, ok := resp.AllocationResult.ResourceAllocation[string(v1.ResourceMemory)]; !ok {
-		resp.AllocationResult.ResourceAllocation[string(v1.ResourceMemory)] = &pluginapi.ResourceAllocationInfo{}
+func ensureToGetMemAllocInfo(resourceAllocation *pluginapi.ResourceAllocation) *pluginapi.ResourceAllocationInfo {
+	if _, ok := resourceAllocation.ResourceAllocation[string(v1.ResourceMemory)]; !ok {
+		resourceAllocation.ResourceAllocation[string(v1.ResourceMemory)] = &pluginapi.ResourceAllocationInfo{}
 	}
 
-	allocInfo := resp.AllocationResult.ResourceAllocation[string(v1.ResourceMemory)]
+	allocInfo := resourceAllocation.ResourceAllocation[string(v1.ResourceMemory)]
 	if allocInfo.Annotations == nil {
 		allocInfo.Annotations = make(map[string]string)
 	}
@@ -95,48 +94,48 @@ func ensureToGetMemAllocInfo(resp *pluginapi.ResourceAllocationResponse) *plugin
 	return allocInfo
 }
 
-func injectRespAnnotationSharedGroup(resp *pluginapi.ResourceAllocationResponse, group string) {
-	allocInfo := ensureToGetMemAllocInfo(resp)
+func injectRespAnnotationSharedGroup(resourceAllocation *pluginapi.ResourceAllocation, group string) {
+	allocInfo := ensureToGetMemAllocInfo(resourceAllocation)
 	allocInfo.Annotations[util.AnnotationRdtClosID] = group
 }
 
-func injectRespAnnotationPodMonGroup(resp *pluginapi.ResourceAllocationResponse,
+func injectRespAnnotationPodMonGroup(podMeta commonstate.AllocationMeta, resourceAllocation *pluginapi.ResourceAllocation,
 	enablingGroups sets.String, group string,
 ) {
+	// check
+
 	if len(enablingGroups) == 0 || enablingGroups.Has(group) {
 		return
 	}
 
-	allocInfo := ensureToGetMemAllocInfo(resp)
+	allocInfo := ensureToGetMemAllocInfo(resourceAllocation)
 	general.InfofV(6, "mbm: pod %s/%s qos %s not need pod mon_groups",
-		resp.PodNamespace, resp.PodName, group)
+		podMeta.PodNamespace, podMeta.PodName, group)
 	allocInfo.Annotations[util.AnnotationRdtNeedPodMonGroups] = strconv.FormatBool(false)
 }
 
-func (r *resctrlHinter) HintResp(qosLevel string,
-	req *pluginapi.ResourceRequest, resp *pluginapi.ResourceAllocationResponse,
-) *pluginapi.ResourceAllocationResponse {
+func (r *resctrlHinter) HintResourceAllocation(podMeta commonstate.AllocationMeta, resourceAllocation *pluginapi.ResourceAllocation) {
 	if r.option == nil || !r.option.EnableResctrlHint {
-		return resp
+		return
 	}
 
-	podShortQoS, ok := annoQoSLevelToShortQoSLevel[qosLevel]
+	podShortQoS, ok := annoQoSLevelToShortQoSLevel[podMeta.QoSLevel]
 	if !ok {
-		general.Errorf("pod admit: fail to identify short qos level for %s; skip resctl hint", qosLevel)
-		return resp
+		general.Errorf("pod admit: fail to identify short qos level for %s; skip resctl hint", podMeta.QoSLevel)
+		return
 	}
 
 	// inject shared subgroup if applicable
-	if qosLevel == apiconsts.PodAnnotationQoSLevelSharedCores {
-		cpusetPool := identifyCPUSetPool(req.Annotations)
+	if podMeta.QoSLevel == apiconsts.PodAnnotationQoSLevelSharedCores {
+		cpusetPool := identifyCPUSetPool(podMeta.Annotations)
 		podShortQoS = r.getSharedSubgroupByPool(cpusetPool)
-		injectRespAnnotationSharedGroup(resp, podShortQoS)
+		injectRespAnnotationSharedGroup(resourceAllocation, podShortQoS)
 	}
 
 	// inject pod mon group (false only) if applicable
-	injectRespAnnotationPodMonGroup(resp, r.closidEnablingGroups, podShortQoS)
+	injectRespAnnotationPodMonGroup(podMeta, resourceAllocation, r.closidEnablingGroups, podShortQoS)
 
-	return resp
+	return
 }
 
 func newResctrlHinter(option *qrm.ResctrlOptions) ResctrlHinter {
