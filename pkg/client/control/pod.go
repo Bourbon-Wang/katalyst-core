@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,6 +99,9 @@ func (r *RealPodUpdater) PatchPod(ctx context.Context, oldPod, newPod *core.Pod)
 	}
 
 	_, err = r.client.CoreV1().Pods(oldPod.Namespace).Patch(ctx, oldPod.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		klog.Errorf("debug: failed to patch pod %q/%q: %s: error: %v", oldPod.Namespace, oldPod.Name, string(patchBytes), err)
+	}
 	return err
 }
 
