@@ -181,7 +181,7 @@ func (o *MemoryOptions) AddFlags(fss *cliflag.NamedFlagSets) {
 		o.CPUSetPoolToSharedSubgroup, "customize shared-xx subgroup if present")
 	fs.IntVar(&o.DefaultSharedSubgroup, "resctrl-default-shared-subgroup",
 		o.DefaultSharedSubgroup, "default subgroup for shared qos")
-	fs.StringSliceVar(&o.MonGroupEnabledClosIDs, "resctrl-mon-groups-enabled_closids",
+	fs.StringSliceVar(&o.MonGroupEnabledClosIDs, "resctrl-mon-groups-enabled-closids",
 		o.MonGroupEnabledClosIDs, "enabled-closid mon-groups")
 }
 
