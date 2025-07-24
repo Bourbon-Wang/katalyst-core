@@ -38,10 +38,10 @@ func (p *PodAdmitter) PostProcessAllocate(req *pluginapi.ResourceRequest, resp *
 		p.preemptNUMANodes(req)
 	}
 
-	if p.podSubgrouper.IsShared30(qosLevel, origReqAnno) {
-		general.InfofV(6, "mbm: resource allocate post process - pod admitting %s/%s, shared-30", req.PodNamespace, req.PodName)
-		p.hintRespWithShared30(resp)
-	}
+	//if p.podSubgrouper.IsShared30(qosLevel, origReqAnno) {
+	//	general.InfofV(6, "mbm: resource allocate post process - pod admitting %s/%s, shared-30", req.PodNamespace, req.PodName)
+	//	p.hintRespWithShared30(resp)
+	//}
 	return resp
 }
 
