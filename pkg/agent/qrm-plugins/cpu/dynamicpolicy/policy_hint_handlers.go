@@ -403,6 +403,14 @@ func (p *DynamicPolicy) calculateHintsForNUMABindingReclaimedCores(reqFloat floa
 
 	p.populateBestEffortHintsByAvailableNUMANodes(hints, candidateLeft)
 
+	general.InfoS("debug: calculate numa hints for reclaimed cores",
+		"nonActualBindingNUMAs", nonActualBindingNUMAs.String(),
+		"nonActualBindingReclaimedRequestedQuantity", nonActualBindingReclaimedRequestedQuantity,
+		"nonActualBindingReclaimedNUMAHeadroom", nonActualBindingReclaimedNUMAHeadroom,
+		"numaHeadroomState", numaHeadroomState,
+		"candidateNUMANodes", candidateNUMANodes,
+		"candidateLeft", candidateLeft)
+
 	// If no valid hints are generated and this is not a single-NUMA scenario, return an error
 	if len(hints.Hints) == 0 && !(p.metaServer.NumNUMANodes == 1 && nonActualBindingNUMAs.Size() > 0) {
 		return nil, cpuutil.ErrNoAvailableCPUHints
