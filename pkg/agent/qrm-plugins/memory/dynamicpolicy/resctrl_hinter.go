@@ -101,6 +101,8 @@ func (r *resctrlHinter) hintResourceAllocation(podMeta commonstate.AllocationMet
 		return
 	}
 
+	general.Infof("debug: hintResourceAllocation: pool name: %s, qos level: %s", podMeta.OwnerPoolName, podMeta.QoSLevel)
+
 	var resctrlGroup string
 	switch podMeta.QoSLevel {
 	case apiconsts.PodAnnotationQoSLevelSystemCores:
@@ -217,5 +219,7 @@ func newResctrlHinter(config *qrm.ResctrlConfig, emitter metrics.MetricEmitter) 
 		root:                 resctrlRoot,
 	}
 	r.monGroupsMaxCount = r.getMonGroupsMaxCount()
+
+	general.Infof("debug: resctrl hint CPUSetPoolToSharedSubgroup: %v", r.config.CPUSetPoolToSharedSubgroup)
 	return r
 }
