@@ -67,7 +67,16 @@ func getSharedSubgroup(val int) string {
 	return fmt.Sprintf(templateSharedSubgroup, val)
 }
 
-func (r *resctrlHinter) getSharedSubgroupByPool(pool string) string {
+func (r *resctrlHinter) getSharedSubgroupByPool(podMeta commonstate.AllocationMeta) string {
+	pool := podMeta.OwnerPoolName
+	if r.config.CPUSetPoolCustomKey != "" {
+		if customPool := podMeta.Annotations[r.config.CPUSetPoolCustomKey]; customPool != "" {
+			pool = customPool
+		}
+		if customPool := podMeta.Labels[r.config.CPUSetPoolCustomKey]; customPool != "" {
+			pool = customPool
+		}
+	}
 	if v, ok := r.config.CPUSetPoolToSharedSubgroup[pool]; ok {
 		return getSharedSubgroup(v)
 	}
@@ -107,7 +116,7 @@ func (r *resctrlHinter) hintResourceAllocation(podMeta commonstate.AllocationMet
 		// tweak the case of system qos
 		resctrlGroup = commonstate.PoolNamePrefixSystem
 	case apiconsts.PodAnnotationQoSLevelSharedCores:
-		resctrlGroup = r.getSharedSubgroupByPool(podMeta.OwnerPoolName)
+		resctrlGroup = r.getSharedSubgroupByPool(podMeta)
 	default:
 		resctrlGroup = podMeta.OwnerPoolName
 	}

@@ -97,6 +97,7 @@ type ResctrlConfig struct {
 	// based on its cpu set pool annotation
 	CPUSetPoolToSharedSubgroup map[string]int
 	DefaultSharedSubgroup      int
+	CPUSetPoolCustomKey        string
 
 	// MonGroupEnabledClosIDs is about mon_group layout hint policy
 	MonGroupEnabledClosIDs []string

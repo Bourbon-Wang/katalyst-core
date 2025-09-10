@@ -83,6 +83,7 @@ type ResctrlOptions struct {
 	// based on its cpu set pool annotation
 	CPUSetPoolToSharedSubgroup map[string]int
 	DefaultSharedSubgroup      int
+	CPUSetPoolCustomKey        string
 
 	// MonGroupEnabledClosIDs specifies mon_groups layout policy of kubelet
 	// by default no special mon_groups layout, which allows kubelet to decide by itself, suitable for scenarios
@@ -187,6 +188,8 @@ func (o *MemoryOptions) AddFlags(fss *cliflag.NamedFlagSets) {
 		o.CPUSetPoolToSharedSubgroup, "customize shared-xx subgroup if present")
 	fs.IntVar(&o.DefaultSharedSubgroup, "resctrl-default-shared-subgroup",
 		o.DefaultSharedSubgroup, "default subgroup for shared qos")
+	fs.StringVar(&o.CPUSetPoolCustomKey, "resctrl-cpuset-pool-custom-key",
+		o.CPUSetPoolCustomKey, "customize cpuset pool key")
 	fs.StringSliceVar(&o.MonGroupEnabledClosIDs, "resctrl-mon-groups-enabled-closids",
 		o.MonGroupEnabledClosIDs, "enabled-closid mon-groups")
 	fs.Float64Var(&o.MonGroupMaxCountRatio, "resctrl-mon-groups-max-count-ratio",
@@ -221,6 +224,7 @@ func (o *MemoryOptions) ApplyTo(conf *qrmconfig.MemoryQRMPluginConfig) error {
 	conf.EnableResctrlHint = o.EnableResctrlHint
 	conf.CPUSetPoolToSharedSubgroup = o.CPUSetPoolToSharedSubgroup
 	conf.DefaultSharedSubgroup = o.DefaultSharedSubgroup
+	conf.CPUSetPoolCustomKey = o.CPUSetPoolCustomKey
 	conf.MonGroupEnabledClosIDs = o.MonGroupEnabledClosIDs
 	conf.MonGroupMaxCountRatio = o.MonGroupMaxCountRatio
 
