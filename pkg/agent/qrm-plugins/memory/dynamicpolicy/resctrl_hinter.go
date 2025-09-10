@@ -77,6 +77,7 @@ func (r *resctrlHinter) getSharedSubgroupByPool(podMeta commonstate.AllocationMe
 			pool = customPool
 		}
 	}
+	general.Infof("resctrl hint: get pool %s pod %s", pool, podMeta.PodName)
 	if v, ok := r.config.CPUSetPoolToSharedSubgroup[pool]; ok {
 		return getSharedSubgroup(v)
 	}
@@ -226,5 +227,7 @@ func newResctrlHinter(config *qrm.ResctrlConfig, emitter metrics.MetricEmitter) 
 		root:                 resctrlRoot,
 	}
 	r.monGroupsMaxCount = r.getMonGroupsMaxCount()
+
+	general.Infof("resctrl hint: config: %+v, monGroupsMaxCount: %d", config, r.monGroupsMaxCount)
 	return r
 }
