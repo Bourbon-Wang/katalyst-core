@@ -77,7 +77,7 @@ func (r *resctrlHinter) getSharedSubgroupByPool(podMeta commonstate.AllocationMe
 			pool = customPool
 		}
 	}
-	general.Infof("resctrl hint: get pool %s pod %s, annotation: %v", pool, podMeta.PodName, podMeta.Annotations)
+	general.Infof("resctrl hint: get pool %s, pod %s, labels: %v, customKey: %s", pool, podMeta.PodName, podMeta.Labels, r.config.CPUSetPoolCustomKey)
 	if v, ok := r.config.CPUSetPoolToSharedSubgroup[pool]; ok {
 		return getSharedSubgroup(v)
 	}
