@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/atomic"
@@ -108,13 +109,11 @@ func (r *resctrlHinter) hintResourceAllocation(podMeta commonstate.AllocationMet
 
 	var resctrlGroup string
 	switch podMeta.QoSLevel {
-	case apiconsts.PodAnnotationQoSLevelSystemCores:
-		// tweak the case of system qos
-		resctrlGroup = commonstate.PoolNamePrefixSystem
 	case apiconsts.PodAnnotationQoSLevelSharedCores:
 		resctrlGroup = r.getSharedSubgroupByPool(podMeta.OwnerPoolName)
 	default:
-		resctrlGroup = podMeta.OwnerPoolName
+		// dedicated, reclaimed, system
+		resctrlGroup = strings.TrimSuffix(podMeta.QoSLevel, "_cores")
 	}
 
 	// when no recognized qos can be identified, no hint
