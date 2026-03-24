@@ -72,7 +72,7 @@ func (im *MetricsManager) UpdateNodeMetrics(name string, scopedNodeMetrics []v1a
 
 	im.Unlock()
 
-	im.statusQueue.Add(name)
+	im.statusQueue.AddRateLimited(name)
 }
 
 func (im *MetricsManager) UpdatePodMetrics(nodeName string, scopedPodMetrics []v1alpha1.ScopedPodMetrics) {
@@ -87,7 +87,7 @@ func (im *MetricsManager) UpdatePodMetrics(nodeName string, scopedPodMetrics []v
 
 	im.Unlock()
 
-	im.statusQueue.Add(nodeName)
+	im.statusQueue.AddRateLimited(nodeName)
 }
 
 func (im *MetricsManager) GetNodeProfileStatusQueue() workqueue.RateLimitingInterface {
